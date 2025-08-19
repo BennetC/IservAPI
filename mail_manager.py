@@ -3,12 +3,12 @@ import os
 
 import requests
 
-from core.services.iserv.draft_id import generate_draft_id
+from draft_id import generate_draft_id
 
 
 class IservAPI:
-    def __init__(self, cookies, account):
-        self.base_url = "https://iserv-gis.de/iserv"
+    def __init__(self, cookies, account, school_url):
+        self.base_url = f"{school_url}/iserv"
         self.account_id = account
 
         # Handle cookies as either a JSON string or a file path
