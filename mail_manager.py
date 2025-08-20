@@ -1,5 +1,6 @@
 import json
 import os
+import base64
 
 import requests
 
@@ -100,9 +101,41 @@ class IservAPI:
 
         return response
 
-    def fetch_drafts(self, title=""):
-        inbox_encoded = "SU5CT1gvRHJhZnRz" # Base64 encoded value for "INBOX/Drafts"
-        api_url = f"{self.mail_api}/message?mailbox[]={inbox_encoded}&limit=25&offset=0&sort=date&order=desc"
+    def fetch_drafts(self, title="", limit=25, offset=0):
+        return self.fetch_mailbox(title=title, inbox_type="drafts", limit=limit, offset=offset)
+
+    def fetch_sent(self, title="", limit=25, offset=0):
+        return self.fetch_mailbox(title=title, inbox_type="sent", limit=limit, offset=offset)
+
+    def fetch_received(self, title="", limit=25, offset=0):
+        return self.fetch_mailbox(title=title, inbox_type="received", limit=limit, offset=offset)
+
+    def fetch_trash(self, title="", limit=25, offset=0):
+        return self.fetch_mailbox(title=title, inbox_type="trash", limit=limit, offset=offset)
+
+    def fetch_unwanted(self, title="", limit=25, offset=0):
+        return self.fetch_mailbox(title=title, inbox_type="unwanted", limit=limit, offset=offset)
+
+    def fetch_archive(self, title="", limit=25, offset=0):
+        return self.fetch_mailbox(title=title, inbox_type="archive", limit=limit, offset=offset)
+
+    def fetch_mailbox(self, title="", inbox_type="received", limit=25, offset=0):
+        inbox_types = {
+            "received": "INBOX",
+            "sent": "INBOX/Sent",
+            "drafts": "INBOX/Drafts",
+            "trash": "INBOX/Trash",
+            "unwanted": "INBOX/Junk",
+            "archive": "INBOX/Archive"
+        }
+
+        inbox_name = inbox_types.get(inbox_type.lower())
+        if not inbox_name:
+            raise ValueError(f"Invalid inbox type: {inbox_type}")
+
+        encoded_inbox = base64.b64encode(inbox_name.encode('utf-8')).decode('utf-8')
+
+        api_url = f"{self.mail_api}/message?mailbox[]={encoded_inbox}&limit={limit}&offset={offset}&sort=date&order=desc"
 
         headers = self.headers
         headers["X-ISERV-CSRF-PROTECTION"] = "yes pls"
@@ -110,14 +143,19 @@ class IservAPI:
 
         if response.status_code == 200:
             response = response.json()
-            inbox = response.get("items", [])
-
             if title:
-                draft = next((item for item in inbox if item.get("subject") == title), None)
-                if draft:
-                    return draft
-
-            return inbox
-
+                # Filter results by title if provided
+                drafts = [item for item in response.get("items", []) if title.lower() == item.get("subject", "").lower()]
+                return drafts
+            else:
+                return response.get("items", [])
         else:
-            return {"error": "Failed to fetch drafts", "status_code": response.status_code, "message": response.text}
+            return {"error": "Failed to fetch mailbox", "status_code": response.status_code, "message": response.text}
+
+
+if __name__ == "__main__":
+    account = "bennet.collins@iserv-gis.de"
+    cookies = "cookies.json"
+    school_url = "https://iserv-gis.de"
+    iserv_api = IservAPI(cookies, account, school_url)
+    mails = iserv_api.fetch_mailbox(inbox_type="received")
